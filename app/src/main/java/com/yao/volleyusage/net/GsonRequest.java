@@ -1,43 +1,44 @@
 package com.yao.volleyusage.net;
 
 
+import android.util.Log;
+
 import com.android.volley.AuthFailureError;
 import com.android.volley.NetworkResponse;
 import com.android.volley.ParseError;
-import com.android.volley.Request;
 import com.android.volley.Response;
-import com.android.volley.Response.ErrorListener;
-import com.android.volley.Response.Listener;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.yao.volleyusage.manager.RequestManager;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Map;
 
+
 /**
  * 生成Object的请求
  */
-public class GsonRequest<T> extends Request<T> {
+public class GsonRequest<T> extends BaseRequest<T> {
     private static final String TAG = "GsonRequest";
-    public RequestManager mRequestManager = RequestManager.getInstance();
     private final Gson gson = new Gson();
     protected static final JsonParser parser = new JsonParser();
     private final Map<String, String> headers;
     protected Map<String, String> params;
-    private final Listener<T> listener;
+    private final Response.Listener<T> listener;
+
+    //request泛型的类
+    private Type mGsonType;
 
     /**
      * @param url     URL of the request to make
      * @param headers Map of request headers
      */
     public GsonRequest(int method, String url, Map<String, String> headers, Map<String, String> params,
-                       Listener<T> listener, ErrorListener errorListener) {
+                       Response.Listener<T> listener, Response.ErrorListener errorListener) {
         super(method, url, errorListener);
         this.headers = headers;
         this.params = params;
@@ -48,11 +49,8 @@ public class GsonRequest<T> extends Request<T> {
      * @param url URL of the request to make
      */
     public GsonRequest(int method, String url,
-                       Listener<T> listener, ErrorListener errorListener) {
-        super(method, url, errorListener);
-        headers = null;
-        params = null;
-        this.listener = listener;
+                       Response.Listener<T> listener, Response.ErrorListener errorListener) {
+        this(method, url,null,null,listener, errorListener);
     }
 
     @Override
@@ -75,24 +73,30 @@ public class GsonRequest<T> extends Request<T> {
         listener.onResponse(response);
     }
 
-
-
-
     /**
      * 获取直接子类的泛型参数
      *
      * @return
      */
-    protected Type getType() {
-        Type superclass = getClass().getGenericSuperclass();
-        while ((superclass instanceof Class) && !superclass.equals(GsonRequest.class)) {
-            superclass = ((Class) superclass).getGenericSuperclass();
+    protected static Type getType(Object obj,Class superclass) {
+        Type type = obj.getClass().getGenericSuperclass();
+        while ((type instanceof Class) && !type.equals(superclass)) {
+            type = ((Class) type).getGenericSuperclass();
         }
-        if (superclass instanceof Class) {
+        if (type instanceof Class) {
             throw new RuntimeException("Missing type parameter.");
         }
-        ParameterizedType parameterized = (ParameterizedType) superclass;
+        ParameterizedType parameterized = (ParameterizedType) type;
         return parameterized.getActualTypeArguments()[0];
+    }
+
+
+    /**
+     * 设置gson解析反射对应的类型
+     * @param type
+     */
+    public void setGsonType(Type type){
+        mGsonType = type;
     }
 
     @Override
@@ -107,10 +111,17 @@ public class GsonRequest<T> extends Request<T> {
         try {
             String json = new String(
                     response.data, HttpHeaderParser.parseCharset(response.headers));
-            json = json.substring(7,json.length()-2);
+            json = json.substring(11,json.length()-15);
+            Log.i(TAG,"reponse json:"+json);
+            Log.i(TAG,"reponse json start:"+json.substring(0,20));
+            Log.i(TAG,"reponse json end:"+json.substring(json.length()-30));
             JsonElement rootElement = parser.parse(json);
+
             JsonObject root = rootElement.getAsJsonObject();
-            Object result = gson.fromJson(root, getType());
+            if (mGsonType == null){
+                mGsonType = getType(this,GsonRequest.class);
+            }
+            Object result = gson.fromJson(root, mGsonType);
             Response<Object> reponseResult = Response.success(result, HttpHeaderParser.parseCacheHeaders(response));
             return (Response<T>) reponseResult;
 
@@ -121,15 +132,4 @@ public class GsonRequest<T> extends Request<T> {
 
 
 
-
-    public void addToRequestQueue() {
-        mRequestManager.addToRequestQueue(this);
-    }
-
-    /**
-     * 给当前request添加一个TAG,一般用当前Activity或者Fragment的名字，即TAG
-     */
-    public void addToRequestQueue(String tag) {
-        mRequestManager.addToRequestQueue(this, tag);
-    }
 }
