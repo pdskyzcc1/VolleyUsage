@@ -21,24 +21,14 @@ public abstract class BaseRequest<T> extends Request<T> {
     private static final String DEFAULT_PARAMS_ENCODING = "UTF-8";
 
     public RequestManager mRequestManager = RequestManager.getInstance();
-    protected String mRequestUrl;
 
-    public BaseRequest(String url, ErrorListener listener) {
-        super(url, listener);
-        mRequestUrl = url;
-    }
+    Map<String, String> headers = new HashMap<>();
+    protected String mRequestUrl;
 
 
     public BaseRequest(int method, String url, ErrorListener listener) {
         super(method, url, listener);
         mRequestUrl = url;
-    }
-
-
-    @Override
-    protected Map<String, String> getParams() throws AuthFailureError {
-        Map<String, String> params = getPublicParams();
-        return params;
     }
 
 
@@ -48,13 +38,27 @@ public abstract class BaseRequest<T> extends Request<T> {
      */
     public static Map<String,String> getPublicParams(){
         Map<String, String> params = new HashMap<String, String>();
+//        params.put("brand", Build.BRAND);
+//        params.put("model", Build.MODEL);
         return params;
+    }
+
+    /**
+     * 避免param为空
+     */
+    static String addParam(String param){
+        if (param == null){
+            return "";
+        }else{
+            return param;
+        }
     }
 
 
     @Override
     public Map<String, String> getHeaders() throws AuthFailureError {
-        return super.getHeaders();
+        //创建一个存header的HashMap,供httpDNS增加参数使用
+        return headers;
     }
 
 
@@ -75,12 +79,7 @@ public abstract class BaseRequest<T> extends Request<T> {
                 getParams.putAll(params[i]);
             }
 
-//            Map<String, String> getParams = getParams();
-//            if (params!=null){
-//                //把构造函数添加进来的参数都放进去
-//                getParams.putAll(params);
-//            }
-            if (getParams != null && getParams.size() > 0) {
+            if (getParams.size() > 0) {
                 StringBuilder encodedParams = new StringBuilder();
 
                 String paramsEncoding = DEFAULT_PARAMS_ENCODING;
@@ -108,7 +107,6 @@ public abstract class BaseRequest<T> extends Request<T> {
 
         return assmbleUrl;
     }
-
 
 
     public void addToRequestQueue() {
